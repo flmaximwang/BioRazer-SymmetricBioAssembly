@@ -8,10 +8,10 @@ description = "A package for assembling and analyzing symmetric biological struc
 authors = [
     "Maxim Wang <wangfanlin2022@sibcb.ac.cn>"
 ]
-version = "0.1.0"
+version = "0.2.0"
 readme = "README.md"
 packages = [
-    { include = "biorazer_sba" }
+    { include = "src/biorazer_sba" }
 ]
 
 [tool.poetry.dependencies]
