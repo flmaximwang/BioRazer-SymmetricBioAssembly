@@ -107,6 +107,17 @@ class AssemblyPartHelixBundle(AssemblyPart):
     """
     A class representing a part of an assembly that is a pure helix.
     It inherits from AssemblyPart and provides specific functionality for helix parts.
+
+    Parameters
+    ----------
+    structure: AtomArray
+        The AtomArray representing the structure of the helix.
+    helix_starts_ends: list[tuple[int, int]]
+        A list of tuples, each containing the start and end indices of the helices in the structure.
+    cc_helix_indices: list[int]
+        A list of indices indicating which helices are part of the coiled coil structure.
+        This is used for fitting the coiled coil structure using the CCCP model.
+
     """
 
     def __init__(
@@ -115,13 +126,6 @@ class AssemblyPartHelixBundle(AssemblyPart):
         helix_starts_ends: list[tuple[int, int]],
         cc_helix_indices=list[int],
     ):
-        """
-        Initialize the AssemblyPartPureHelix with a structure and a list of helices.
-
-        :param structure: The AtomArray representing the structure of the helix.
-        :param helices: A list of tuples, each containing the start and end indices of the helix in the structure.
-        :param senses: a list of 1 and -1 indicating the sense of each helix.
-        """
         super().__init__(structure)
         assert (
             len(helix_starts_ends) > 1

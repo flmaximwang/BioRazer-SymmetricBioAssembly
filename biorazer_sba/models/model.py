@@ -3,6 +3,7 @@ from biotite.structure.io import pdb
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 from ..utils.alignment import calculate_rotation, calculate_euler_ZXZ
+from biorazer.structure.io import PDB2STRUCT
 
 
 class AssemblyPart:
@@ -84,6 +85,35 @@ class AssemblyPart:
                 f"Current z: {z}"
             )
 
+    def rotate_centered(self, rotation):
+        """
+        Rotate the structure with a given rotation object.
+        The structure is first centered, then rotated, and finally translated back.
+        """
+        center_rotation = self.calculate_center_rotation()
+        center_translation = self.calculate_center_translation()
+        self.structure.coord += center_translation
+        self.structure.coord = center_rotation.apply(self.structure.coord)
+
+        self.structure.coord = rotation.apply(self.structure.coord)
+
+        inv_center_rotation = center_rotation.inv()
+        inv_center_translation = -center_translation
+        self.structure.coord = inv_center_rotation.apply(self.structure.coord)
+        self.structure.coord += inv_center_translation
+
+    def rotate_euler_centered(self, axis_spec, a, b, c, degrees=False):
+        rotation = R.from_euler(axis_spec, [a, b, c], degrees=degrees)
+        self.rotate_centered(rotation)
+
+    def rotate_quat_centered(self, x, y, z, w):
+        """
+        Rotate the structure with a quaternion (x, y, z, w).
+        The structure is first centered, then rotated, and finally translated back.
+        """
+        rotation = R.from_quat([x, y, z, w])
+        self.rotate_centered(rotation)
+
     def rotate_euler_ZXZ(self, a, b, c, degrees=False):
         """
         Rotate the structure with euler angles (a, b, c) in ZXZ convection. a, b, c are provided in degrees.
@@ -113,6 +143,13 @@ class AssemblyPart:
         rotation = R.from_euler("xyz", [a, b, c], degrees=degrees)
         angles_xyz = rotation.as_euler("xyz", degrees=False)
         self.structure = bio_struct.rotate(self.structure, angles_xyz)
+
+    def rotate_quat(self, x, y, z, w):
+        """
+        Rotate the structure with quaternion (x, y, z, w).
+        """
+        rotation = R.from_quat([x, y, z, w])
+        self.structure.coord = rotation.apply(self.structure.coord)
 
     def calculate_center_rotation(self):
         """
@@ -149,6 +186,23 @@ class AssemblyPart:
             self.translate(*translation)
             self.rotate_euler_xyz(*xyz_rotation)
 
+    def generate_fiber(self, x, y, z, quat_x, quat_y, quat_z, quat_w, unit_number):
+        """
+        Generate a fiber structure by translating and rotating the parts.
+        The fiber is generated along the direction (x, y, z) with the specified quaternion.
+        """
+        res = Assembly([self.copy()])
+        chain_id = res[-1].structure.chain_id[0]
+        part_len = self.structure.shape[0]
+        for i in range(1, unit_number):
+            res.center(-1)
+            res.append(self.copy())
+            res.rotate_quat(-1, quat_x, quat_y, quat_z, quat_w)
+            res.translate(-1, x, y, z)
+            res[-1].structure.chain_id = [chr(ord(chain_id) + i)] * part_len
+        res.center(0)
+        return res
+
 
 class Assembly:
 
@@ -172,6 +226,17 @@ class Assembly:
             parts.append(part)
         return Assembly(parts)
 
+    @staticmethod
+    def from_pdb(part_type: AssemblyPart, pdb_file, **kwargs):
+        """Load the structure from a single PDB file. Every chain is treated as an AssemblyPart"""
+        structure = PDB2STRUCT(pdb_file, "").read()
+        parts = []
+        for chain in bio_struct.get_chains(structure):
+            chain_structure = structure[structure.chain_id == chain]
+            part = part_type(chain_structure, **kwargs)
+            parts.append(part)
+        return Assembly(parts)
+
     def to_pdbs(self, output_file_stem):
         """Export the structure to multiple PDB files"""
         for i, part in enumerate(self.parts):
@@ -185,6 +250,12 @@ class Assembly:
         pdb_file = pdb.PDBFile()
         pdb.set_structure(pdb_file, merged_structure)
         pdb_file.write(output_filename)
+
+    def __getitem__(self, index):
+        """Get a specific part by index."""
+        if isinstance(index, slice):
+            return Assembly(self.parts[index])
+        return self.parts[index]
 
     def check_part_index(self, part_index):
         """Check if the part index is valid."""
@@ -202,15 +273,28 @@ class Assembly:
         return part.calculate_z()
 
     def calculate_x_direction(self, part_index):
-        self.check_part_index(part_index)
-        part: AssemblyPart = self.parts[part_index]
+        part: AssemblyPart = self[part_index]
         return part.calculate_x()
 
     def translate(self, part_index, x, y, z):
         """Translate a specific part by (x, y, z)."""
+        part: AssemblyPart = self[part_index]
+        part.translate(x, y, z)
+
+    def rotate_quat(self, part_index, x, y, z, w):
+        """
+        Rotate a specific part with quaternion (x, y, z, w).
+        """
+        part: AssemblyPart = self[part_index]
+        part.rotate_quat(x, y, z, w)
+
+    def rotate_quat_centered(self, part_index, x, y, z, w):
+        """
+        Rotate a specific part with quaternion (x, y, z, w) after centering it.
+        """
         self.check_part_index(part_index)
         part: AssemblyPart = self.parts[part_index]
-        part.translate(x, y, z)
+        part.rotate_quat_centered(x, y, z, w)
 
     def rotate_euler(self, part_index, axis_spec, euler_angles, degrees=False):
         """
@@ -267,7 +351,41 @@ class Assembly:
         centroid_2 = part_2.calculate_centroid()
         return centroid_2 - centroid_1
 
-    def calculate_ZXZ_euler_between(self, part_index_1, part_index_2, degrees=False):
+    def calculate_rotation_between(self, part_index_1, part_index_2):
+        """
+        Calculate the rotation that aligns part_index_1 with part_index_2.
+        Returns the angles (a, b, c) in degrees.
+        """
+        self.check_part_index(part_index_1)
+        self.check_part_index(part_index_2)
+        part_1: AssemblyPart = self.parts[part_index_1]
+        part_1.check_xz_aligned()
+        part_2: AssemblyPart = self.parts[part_index_2]
+        x, y, z = part_2.calculate_xyz()
+        return calculate_rotation(x, y, z)
+
+    def calculate_ZXZ_euler_between_old(
+        self, part_index_1, part_index_2, degrees=False
+    ):
+        """
+        Calculate the ZXZ rotation that aligns part_index_1 with part_index_2.
+        Returns the angles (a, b, c) in degrees.
+        """
+        rotation = self.calculate_rotation_between(part_index_1, part_index_2)
+        euler_angles = rotation.as_euler("ZXZ", degrees=degrees)
+        return euler_angles
+
+    def calculate_quat_between(self, part_index_1, part_index_2):
+        """
+        Calculate the quaternion that aligns part_index_1 with part_index_2.
+        Returns the quaternion (x, y, z, w).
+        """
+        rotation = self.calculate_rotation_between(part_index_1, part_index_2)
+        return rotation.as_quat(scalar_first=False, canonical=True)
+
+    def calculate_ZXZ_euler_between_old(
+        self, part_index_1, part_index_2, degrees=False
+    ):
         """
         Calculate the ZXZ rotation that aligns part_index_1 with part_index_2.
         Returns the angles (a, b, c) in degrees.

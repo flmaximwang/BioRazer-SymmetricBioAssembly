@@ -8,15 +8,15 @@ description = "A package for assembling and analyzing symmetric biological struc
 authors = [
     "Maxim Wang <wangfanlin2022@sibcb.ac.cn>"
 ]
-version = "0.2.0"
+version = "0.2.1"
 readme = "README.md"
 packages = [
-    { include = "src/biorazer_sba" }
+    { include = "biorazer_sba" }
 ]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 biotite = "*"
 scipy = "^1.16.1"
-numpy = "^2.3.2"
+numpy = "^2"
 matplotlib = "^3.10.5"
