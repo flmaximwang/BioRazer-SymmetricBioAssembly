@@ -2,7 +2,7 @@ import biotite.structure as bio_struct
 from biotite.structure.io import pdb
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from ..utils.alignment import calculate_rotation, calculate_euler_ZXZ
+from ..util.alignment import calculate_rotation, calculate_euler_ZXZ
 from biorazer.structure.io import PDB2STRUCT
 
 

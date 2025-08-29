@@ -1,7 +1,8 @@
-from ..utils.helix import direction
-from .model import *
-from ..utils import alignment
-from biorazer_sba.utils.helix.cccp.fitter import fit_helix_by_crick, fit_sym_cc_by_crick
+from ..util.helix import direction
+from .basic import *
+from ..util import alignment
+from biorazer.structure.io import PDB2STRUCT
+from biorazer_sba.util.helix.cccp.fitter import fit_helix_by_crick, fit_sym_cc_by_crick
 
 
 class AssemblyPartSingleHelix(AssemblyPart):
@@ -135,7 +136,7 @@ class AssemblyPartHelixBundle(AssemblyPart):
         self.cc_helix_indices = cc_helix_indices
 
     @staticmethod
-    def from_pdb(pdb_file_path, **kwargs):
+    def from_pdb(pdb, **kwargs):
         """
         Load the structure from a PDB file and create an AssemblyPartHelixBundle instance.
 
@@ -145,7 +146,7 @@ class AssemblyPartHelixBundle(AssemblyPart):
         :param plane_helix_indices: A list of two indices indicating which helices define the plane.
         :return: An instance of AssemblyPartHelixBundle.
         """
-        structure = pdb.get_structure(pdb.PDBFile.read(pdb_file_path))[0]
+        structure = PDB2STRUCT(pdb, "").read()
         return AssemblyPartHelixBundle(structure, **kwargs)
 
     def copy(self):

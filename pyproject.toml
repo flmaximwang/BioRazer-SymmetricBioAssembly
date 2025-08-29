@@ -3,12 +3,12 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "biorazer-symmetric-bio-assembly"
+name = "biorazer-sbassembly"
 description = "A package for assembling and analyzing symmetric biological structures."
 authors = [
     "Maxim Wang <wangfanlin2022@sibcb.ac.cn>"
 ]
-version = "0.2.1"
+version = "0.2.2"
 readme = "README.md"
 packages = [
     { include = "biorazer_sba" }
